@@ -164,9 +164,10 @@ class RAGService:
 
     @staticmethod
     def _ensure_openai_api_key() -> None:
-        if not os.getenv("OPENAI_API_KEY"):
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key or api_key == "replace-with-your-openai-api-key":
             raise ExternalServiceError(
-                "Falta OPENAI_API_KEY. Agrega tu API key en un archivo .env o en las variables de entorno."
+                "Falta OPENAI_API_KEY. Reemplaza el valor de OPENAI_API_KEY en tu archivo .env local."
             )
 
     def _vector_store(self) -> PGVector:

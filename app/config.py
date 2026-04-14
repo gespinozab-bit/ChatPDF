@@ -21,7 +21,7 @@ def _env_int(name: str, default: int) -> int:
 class Settings:
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg://postgres:postgres@localhost:5432/week_8",
+        "postgresql+psycopg://postgres:postgres@localhost:5433/week_8",
     )
     collection_name: str = os.getenv("PGVECTOR_COLLECTION", "pdf_chat_documents")
     embedding_model: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-large")
