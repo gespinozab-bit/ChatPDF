@@ -217,14 +217,20 @@ class RAGService:
 
     def _local_similarity_search(self, query: str, top_k: int) -> list[Any]:
         query_vector = self._term_vector(query)
+        if not query_vector:
+            return self._local_chunks[:top_k]
+
         scored = []
+        required_coverage = self._required_coverage(query_vector)
         for chunk in self._local_chunks:
-            score = self._cosine_similarity(query_vector, self._term_vector(chunk.page_content))
-            if score > 0:
-                scored.append((score, chunk))
+            chunk_vector = self._term_vector(chunk.page_content)
+            score = self._cosine_similarity(query_vector, chunk_vector)
+            coverage = self._term_coverage(query_vector, chunk_vector)
+            if score >= 0.035 and coverage >= required_coverage:
+                scored.append((score + coverage, chunk))
 
         if not scored:
-            return self._local_chunks[:top_k]
+            return []
 
         scored.sort(key=lambda item: item[0], reverse=True)
         return [chunk for _, chunk in scored[:top_k]]
@@ -232,6 +238,7 @@ class RAGService:
     def _extractive_answer(self, question: str, docs: list[Any]) -> str:
         sentences = []
         question_vector = self._term_vector(question)
+        required_coverage = self._required_coverage(question_vector)
         for doc in docs:
             for sentence in re.split(r"(?<=[.!?])\s+", doc.page_content.strip()):
                 clean_sentence = sentence.strip()
@@ -240,9 +247,11 @@ class RAGService:
                 if not question_vector:
                     sentences.append((1.0, clean_sentence))
                     continue
-                score = self._cosine_similarity(question_vector, self._term_vector(clean_sentence))
-                if score > 0:
-                    sentences.append((score, clean_sentence))
+                sentence_vector = self._term_vector(clean_sentence)
+                score = self._cosine_similarity(question_vector, sentence_vector)
+                coverage = self._term_coverage(question_vector, sentence_vector)
+                if score >= 0.08 and coverage >= required_coverage:
+                    sentences.append((score + coverage, clean_sentence))
 
         if not sentences:
             return "No se encontro suficiente informacion en el PDF para responder."
@@ -293,6 +302,21 @@ class RAGService:
         if not left_norm or not right_norm:
             return 0.0
         return numerator / (left_norm * right_norm)
+
+    @staticmethod
+    def _term_coverage(query_vector: Counter[str], candidate_vector: Counter[str]) -> float:
+        if not query_vector or not candidate_vector:
+            return 0.0
+        matches = set(query_vector) & set(candidate_vector)
+        return len(matches) / len(set(query_vector))
+
+    @staticmethod
+    def _required_coverage(query_vector: Counter[str]) -> float:
+        if len(query_vector) <= 2:
+            return 1.0
+        if len(query_vector) <= 4:
+            return 0.75
+        return 0.6
 
     @staticmethod
     def _write_temp_pdf(file_bytes: bytes) -> str:
