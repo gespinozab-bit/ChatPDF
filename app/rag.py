@@ -42,6 +42,7 @@ class ProcessedDocument:
     pages: int
     chunks: int
     collection_name: str
+    mode: str
 
 
 class RAGService:
@@ -107,6 +108,7 @@ class RAGService:
             pages=len(pages),
             chunks=len(chunks),
             collection_name=self._collection_label(),
+            mode=self.current_mode_label(),
         )
 
     def answer_question(self, question: str, top_k: int) -> dict[str, Any]:
@@ -129,6 +131,7 @@ class RAGService:
         if not docs:
             return {
                 "answer": "No se encontro suficiente informacion en el PDF para responder.",
+                "mode": self.current_mode_label(),
                 "chunks": [],
             }
 
@@ -166,6 +169,7 @@ class RAGService:
 
         return {
             "answer": answer,
+            "mode": self.current_mode_label(),
             "chunks": [
                 {
                     "index": index,
@@ -214,6 +218,11 @@ class RAGService:
         if self._storage_mode == "local":
             return "local_memory_fallback"
         return self.settings.collection_name
+
+    def current_mode_label(self) -> str:
+        if self._storage_mode == "local":
+            return "Modo local sin LLM"
+        return "OpenAI + PGVector"
 
     def _local_similarity_search(self, query: str, top_k: int) -> list[Any]:
         query_vector = self._term_vector(query)

@@ -10,6 +10,7 @@ class UploadResponse(BaseModel):
     pages: int
     chunks: int
     collection_name: str
+    mode: str
 
 
 class QuestionRequest(BaseModel):
@@ -26,3 +27,4 @@ class RetrievedChunk(BaseModel):
 class AnswerResponse(BaseModel):
     answer: str
     chunks: list[RetrievedChunk]
+    mode: str

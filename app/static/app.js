@@ -1,12 +1,17 @@
 const uploadForm = document.querySelector("#upload-form");
 const askForm = document.querySelector("#ask-form");
 const uploadStatus = document.querySelector("#upload-status");
+const modeStatus = document.querySelector("#mode-status");
 const answerBox = document.querySelector("#answer");
 const chunksBox = document.querySelector("#chunks");
 
 function setStatus(message, type = "") {
   uploadStatus.textContent = message;
   uploadStatus.className = `status ${type}`.trim();
+}
+
+function setMode(mode) {
+  modeStatus.textContent = `Modo: ${mode}`;
 }
 
 function setBusy(form, busy) {
@@ -50,6 +55,7 @@ uploadForm.addEventListener("submit", async (event) => {
       throw new Error(await readError(response));
     }
     const data = await response.json();
+    setMode(data.mode);
     setStatus(
       `PDF procesado: ${data.filename}. Paginas: ${data.pages}. Chunks: ${data.chunks}. Coleccion: ${data.collection_name}.`,
       "success"
@@ -86,6 +92,7 @@ askForm.addEventListener("submit", async (event) => {
     }
 
     const data = await response.json();
+    setMode(data.mode);
     answerBox.textContent = data.answer;
     renderChunks(data.chunks);
   } catch (error) {

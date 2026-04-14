@@ -106,6 +106,17 @@ h2 {
   margin: 0.75rem 0 0;
 }
 
+.mode-badge {
+  background: #eef5f1;
+  border: 1px solid #cfe4d8;
+  border-radius: 8px;
+  color: #146c43;
+  display: inline-block;
+  font-weight: 700;
+  margin: 0.75rem 0 0;
+  padding: 0.45rem 0.7rem;
+}
+
 .status.error {
   color: #b42318;
 }
