@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_postgres import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from openai import AuthenticationError, RateLimitError
 
 from .config import Settings, settings
 
@@ -83,6 +84,14 @@ class RAGService:
             vector_store.add_documents(documents=chunks)
         except ExternalServiceError:
             raise
+        except AuthenticationError as exc:
+            raise ExternalServiceError(
+                "OpenAI rechazo la API key. Verifica que OPENAI_API_KEY sea valida y este activa."
+            ) from exc
+        except RateLimitError as exc:
+            raise ExternalServiceError(
+                "OpenAI rechazo la solicitud por cuota insuficiente. Revisa billing, creditos o limites de tu cuenta."
+            ) from exc
         except Exception as exc:
             raise ExternalServiceError(
                 "Fallo al generar embeddings o guardar en PGVector. Revisa OpenAI y PostgreSQL."
@@ -143,6 +152,14 @@ class RAGService:
                     ),
                 ]
             )
+        except AuthenticationError as exc:
+            raise ExternalServiceError(
+                "OpenAI rechazo la API key. Verifica que OPENAI_API_KEY sea valida y este activa."
+            ) from exc
+        except RateLimitError as exc:
+            raise ExternalServiceError(
+                "OpenAI rechazo la solicitud por cuota insuficiente. Revisa billing, creditos o limites de tu cuenta."
+            ) from exc
         except Exception as exc:
             raise ExternalServiceError("Fallo la llamada al modelo de lenguaje.") from exc
 

@@ -135,6 +135,12 @@ La API maneja casos basicos:
 - fallos al guardar o consultar PGVector,
 - fallos al llamar al LLM.
 
+## Problemas comunes
+
+Si ves un error de `OPENAI_API_KEY`, revisa que exista un archivo `.env` real en la raiz del proyecto. `.env.example` es solo una plantilla y no debe contener secretos.
+
+Si OpenAI responde `insufficient_quota`, la API key fue leida correctamente, pero la cuenta no tiene cuota, creditos o billing disponible para embeddings/LLM. Revisa tu cuenta de OpenAI o usa una API key con cuota activa.
+
 ## Endpoints
 
 ```text
