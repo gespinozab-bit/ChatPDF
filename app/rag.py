@@ -1,6 +1,9 @@
 import os
+import re
 import tempfile
+from collections import Counter
 from dataclasses import dataclass
+from math import sqrt
 from typing import Any
 
 from langchain_community.document_loaders import PyPDFLoader
@@ -46,6 +49,8 @@ class RAGService:
         self.settings = app_settings
         self._has_document = False
         self._current_filename: str | None = None
+        self._local_chunks: list[Any] = []
+        self._storage_mode = "pgvector"
 
     def process_pdf(self, file_bytes: bytes, filename: str) -> ProcessedDocument:
         if not file_bytes:
@@ -83,19 +88,16 @@ class RAGService:
             vector_store = self._reset_vector_store()
             vector_store.add_documents(documents=chunks)
         except ExternalServiceError:
-            raise
-        except AuthenticationError as exc:
-            raise ExternalServiceError(
-                "OpenAI rechazo la API key. Verifica que OPENAI_API_KEY sea valida y este activa."
-            ) from exc
-        except RateLimitError as exc:
-            raise ExternalServiceError(
-                "OpenAI rechazo la solicitud por cuota insuficiente. Revisa billing, creditos o limites de tu cuenta."
-            ) from exc
-        except Exception as exc:
-            raise ExternalServiceError(
-                "Fallo al generar embeddings o guardar en PGVector. Revisa OpenAI y PostgreSQL."
-            ) from exc
+            self._use_local_fallback(chunks, filename)
+        except AuthenticationError:
+            self._use_local_fallback(chunks, filename)
+        except RateLimitError:
+            self._use_local_fallback(chunks, filename)
+        except Exception:
+            self._use_local_fallback(chunks, filename)
+        else:
+            self._local_chunks = chunks
+            self._storage_mode = "pgvector"
 
         self._has_document = True
         self._current_filename = filename
@@ -104,7 +106,7 @@ class RAGService:
             filename=filename,
             pages=len(pages),
             chunks=len(chunks),
-            collection_name=self.settings.collection_name,
+            collection_name=self._collection_label(),
         )
 
     def answer_question(self, question: str, top_k: int) -> dict[str, Any]:
@@ -114,13 +116,14 @@ class RAGService:
         if not self._has_document:
             raise NoDocumentError("Primero sube y procesa un PDF.")
 
-        try:
-            vector_store = self._vector_store()
-            docs = vector_store.similarity_search(query=clean_question, k=top_k)
-        except ExternalServiceError:
-            raise
-        except Exception as exc:
-            raise ExternalServiceError("Fallo la busqueda en el vector store.") from exc
+        if self._storage_mode == "local":
+            docs = self._local_similarity_search(clean_question, top_k)
+        else:
+            try:
+                vector_store = self._vector_store()
+                docs = vector_store.similarity_search(query=clean_question, k=top_k)
+            except Exception:
+                docs = self._local_similarity_search(clean_question, top_k)
 
         docs = [doc for doc in docs if doc.page_content.strip()]
         if not docs:
@@ -153,18 +156,16 @@ class RAGService:
                 ]
             )
         except AuthenticationError as exc:
-            raise ExternalServiceError(
-                "OpenAI rechazo la API key. Verifica que OPENAI_API_KEY sea valida y este activa."
-            ) from exc
-        except RateLimitError as exc:
-            raise ExternalServiceError(
-                "OpenAI rechazo la solicitud por cuota insuficiente. Revisa billing, creditos o limites de tu cuenta."
-            ) from exc
-        except Exception as exc:
-            raise ExternalServiceError("Fallo la llamada al modelo de lenguaje.") from exc
+            answer = self._extractive_answer(clean_question, docs)
+        except RateLimitError:
+            answer = self._extractive_answer(clean_question, docs)
+        except Exception:
+            answer = self._extractive_answer(clean_question, docs)
+        else:
+            answer = str(response.content).strip()
 
         return {
-            "answer": str(response.content).strip(),
+            "answer": answer,
             "chunks": [
                 {
                     "index": index,
@@ -203,6 +204,95 @@ class RAGService:
             # The collection may not exist on the first upload.
             pass
         return self._vector_store()
+
+    def _use_local_fallback(self, chunks: list[Any], filename: str) -> None:
+        self._local_chunks = chunks
+        self._current_filename = filename
+        self._storage_mode = "local"
+
+    def _collection_label(self) -> str:
+        if self._storage_mode == "local":
+            return "local_memory_fallback"
+        return self.settings.collection_name
+
+    def _local_similarity_search(self, query: str, top_k: int) -> list[Any]:
+        query_vector = self._term_vector(query)
+        scored = []
+        for chunk in self._local_chunks:
+            score = self._cosine_similarity(query_vector, self._term_vector(chunk.page_content))
+            if score > 0:
+                scored.append((score, chunk))
+
+        if not scored:
+            return self._local_chunks[:top_k]
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [chunk for _, chunk in scored[:top_k]]
+
+    def _extractive_answer(self, question: str, docs: list[Any]) -> str:
+        sentences = []
+        question_vector = self._term_vector(question)
+        for doc in docs:
+            for sentence in re.split(r"(?<=[.!?])\s+", doc.page_content.strip()):
+                clean_sentence = sentence.strip()
+                if len(clean_sentence) < 30:
+                    continue
+                if not question_vector:
+                    sentences.append((1.0, clean_sentence))
+                    continue
+                score = self._cosine_similarity(question_vector, self._term_vector(clean_sentence))
+                if score > 0:
+                    sentences.append((score, clean_sentence))
+
+        if not sentences:
+            return "No se encontro suficiente informacion en el PDF para responder."
+
+        sentences.sort(key=lambda item: item[0], reverse=True)
+        selected = [sentence for _, sentence in sentences[:3]]
+        return (
+            "Modo local sin LLM: con base en los chunks recuperados, la informacion mas relevante es: "
+            + " ".join(selected)
+        )
+
+    @staticmethod
+    def _term_vector(text: str) -> Counter[str]:
+        stop_words = {
+            "a",
+            "al",
+            "cual",
+            "de",
+            "del",
+            "documento",
+            "el",
+            "en",
+            "es",
+            "la",
+            "las",
+            "lo",
+            "los",
+            "por",
+            "que",
+            "se",
+            "sobre",
+            "trata",
+            "un",
+            "una",
+            "y",
+        }
+        tokens = re.findall(r"[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9]{3,}", text.lower())
+        return Counter(token for token in tokens if token not in stop_words)
+
+    @staticmethod
+    def _cosine_similarity(left: Counter[str], right: Counter[str]) -> float:
+        if not left or not right:
+            return 0.0
+        common = set(left) & set(right)
+        numerator = sum(left[token] * right[token] for token in common)
+        left_norm = sqrt(sum(value * value for value in left.values()))
+        right_norm = sqrt(sum(value * value for value in right.values()))
+        if not left_norm or not right_norm:
+            return 0.0
+        return numerator / (left_norm * right_norm)
 
     @staticmethod
     def _write_temp_pdf(file_bytes: bytes) -> str:

@@ -2,13 +2,20 @@
 
 Aplicacion web minima tipo "Chat with your PDF" construida con FastAPI, LangChain, OpenAI y PGVector.
 
-La app permite subir un PDF, dividirlo en chunks, generar embeddings, guardarlos en PostgreSQL con pgvector, recuperar los chunks mas relevantes y generar una respuesta con un LLM usando solo el contexto recuperado.
+La app permite subir un PDF, dividirlo en chunks, generar embeddings, guardarlos en PostgreSQL con pgvector, recuperar los chunks mas relevantes y generar una respuesta con un LLM usando solo el contexto recuperado. Si OpenAI no tiene cuota disponible, la app cae a un modo local extractivo para seguir funcionando sin bloquear la demo.
 
 ## Arquitectura
 
 ```text
 PDF -> PyPDFLoader -> RecursiveCharacterTextSplitter -> OpenAIEmbeddings
     -> PGVector -> similarity_search -> ChatOpenAI -> respuesta + chunks
+```
+
+Modo de respaldo:
+
+```text
+PDF -> PyPDFLoader -> RecursiveCharacterTextSplitter -> busqueda lexica local
+    -> respuesta extractiva usando solo chunks recuperados
 ```
 
 Estructura principal:
@@ -108,6 +115,8 @@ http://127.0.0.1:8000
 
 Al subir un PDF nuevo, la app limpia la coleccion configurada en `PGVECTOR_COLLECTION` y guarda los chunks del nuevo documento. Esto evita mezclar respuestas entre PDFs.
 
+Si OpenAI no tiene cuota o PGVector no esta disponible, el PDF se mantiene en memoria como `local_memory_fallback`. En ese modo puedes preguntar durante la sesion actual del servidor, pero debes volver a subir el PDF si reinicias Uvicorn.
+
 ## Hacer preguntas
 
 1. Escribe una pregunta sobre el PDF procesado.
@@ -139,7 +148,7 @@ La API maneja casos basicos:
 
 Si ves un error de `OPENAI_API_KEY`, revisa que exista un archivo `.env` real en la raiz del proyecto. `.env.example` es solo una plantilla y no debe contener secretos.
 
-Si OpenAI responde `insufficient_quota`, la API key fue leida correctamente, pero la cuenta no tiene cuota, creditos o billing disponible para embeddings/LLM. Revisa tu cuenta de OpenAI o usa una API key con cuota activa.
+Si OpenAI responde `insufficient_quota`, la API key fue leida correctamente, pero la cuenta no tiene cuota, creditos o billing disponible para embeddings/LLM. La app usa el modo local extractivo como respaldo para que puedas seguir probando, aunque la calidad de respuesta sera menor que con el LLM.
 
 ## Endpoints
 
