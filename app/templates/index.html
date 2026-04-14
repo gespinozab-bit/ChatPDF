@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chat with your PDF</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="intro">
+        <p class="eyebrow">RAG con FastAPI</p>
+        <h1>Chat with your PDF</h1>
+        <p>Sube un PDF, espera el procesamiento y pregunta usando el contenido recuperado.</p>
+      </section>
+
+      <section class="panel">
+        <form id="upload-form" class="upload-row">
+          <label for="pdf-file">PDF</label>
+          <input id="pdf-file" name="file" type="file" accept="application/pdf" required />
+          <button type="submit">Procesar PDF</button>
+        </form>
+        <p id="upload-status" class="status" aria-live="polite">Sin documento procesado.</p>
+      </section>
+
+      <section class="panel">
+        <form id="ask-form" class="ask-form">
+          <label for="question">Pregunta</label>
+          <textarea id="question" rows="4" placeholder="Escribe tu pregunta sobre el PDF..." required></textarea>
+          <div class="ask-actions">
+            <label for="top-k">Chunks</label>
+            <input id="top-k" type="number" min="1" max="10" value="4" />
+            <button type="submit">Preguntar</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="results-stack">
+        <article class="panel">
+          <h2>Respuesta</h2>
+          <div id="answer" class="answer">La respuesta aparecera aqui.</div>
+        </article>
+
+        <article class="panel">
+          <h2>Chunks recuperados</h2>
+          <div id="chunks" class="chunks">Los fragmentos relevantes apareceran aqui.</div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
