@@ -48,6 +48,100 @@ Instala las dependencias:
 uv sync
 ```
 
+Para incluir las herramientas de desarrollo, incluida la herramienta SAST:
+
+```bash
+uv sync --dev
+```
+
+## SAST con Bandit
+
+Este proyecto integra [Bandit](https://bandit.readthedocs.io/) como herramienta SAST del ecosistema DevSecOps para detectar patrones inseguros en codigo Python.
+
+Ejecuta el analisis localmente con:
+
+```bash
+uv run bandit -c pyproject.toml -r app ingestor.py query.py
+```
+
+El mismo analisis esta definido en `.github/workflows/sast.yml` para ejecutarse en `push` a `main` y en cada `pull_request`.
+
+## SAST con SonarQube
+
+Tambien se incluye SonarQube como herramienta SAST con dashboard web. Esta opcion es util para explicar DevSecOps en clase porque muestra metricas visuales de seguridad, mantenibilidad, bugs, code smells y duplicacion.
+
+Archivos usados:
+
+- `docker-compose.yml`: levanta SonarQube y un contenedor `sonar-scanner`.
+- `sonar-project.properties`: define que archivos del proyecto se analizan.
+- `.env`: guarda el token local de SonarQube en `SONAR_TOKEN`.
+
+Levanta SonarQube:
+
+```bash
+docker compose up -d sonarqube
+```
+
+Abre el dashboard:
+
+```text
+http://localhost:9000
+```
+
+Credenciales iniciales:
+
+```text
+usuario: admin
+password: admin
+```
+
+SonarQube pedira cambiar la contrasena la primera vez. Luego genera un token en:
+
+```text
+My Account -> Security -> Generate Tokens
+```
+
+Agrega el token al archivo `.env`:
+
+```bash
+SONAR_TOKEN=replace-with-your-sonarqube-token
+```
+
+Ejecuta el analisis SAST con el scanner:
+
+```bash
+docker compose --profile manual run --rm sonar-scanner
+```
+
+Al terminar, los resultados aparecen en:
+
+```text
+http://localhost:9000/dashboard?id=week-8-rag
+```
+
+Para detener SonarQube:
+
+```bash
+docker compose down
+```
+
+### Explicacion para clase
+
+SAST significa Static Application Security Testing. Es una practica DevSecOps que analiza el codigo fuente sin ejecutar la aplicacion. En este proyecto, SonarQube revisa archivos Python como `app/main.py`, `app/rag.py`, `ingestor.py` y `query.py`.
+
+El flujo es:
+
+```text
+Codigo fuente -> sonar-scanner -> SonarQube -> Dashboard de resultados
+```
+
+La idea es encontrar riesgos antes de desplegar. Por ejemplo, si un desarrollador agrega codigo inseguro, SonarQube puede reportarlo como vulnerabilidad, bug o code smell. Asi el equipo corrige el problema antes de que llegue a produccion.
+
+En este proyecto quedan dos niveles de SAST:
+
+- `Bandit`: rapido, especializado en Python y facil de ejecutar en terminal o GitHub Actions.
+- `SonarQube`: visual, con dashboard local para explicar el analisis y presentar resultados.
+
 ## Variables de entorno
 
 Crea un archivo `.env` en la raiz del proyecto:
@@ -62,6 +156,7 @@ CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 TOP_K=4
 MAX_UPLOAD_MB=20
+SONAR_TOKEN=replace-with-your-sonarqube-token
 ```
 
 Valores importantes:
@@ -73,6 +168,7 @@ Valores importantes:
 - `CHUNK_SIZE` y `CHUNK_OVERLAP`: controlan la division del PDF.
 - `TOP_K`: numero por defecto de chunks recuperados.
 - `MAX_UPLOAD_MB`: limite de subida desde la UI.
+- `SONAR_TOKEN`: token local usado por `sonar-scanner` para enviar resultados a SonarQube.
 
 ## PostgreSQL con pgvector
 

@@ -1,0 +1,47 @@
+services:
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: week8-sonarqube
+    ports:
+      - "9000:9000"
+    networks:
+      - sonarnet
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  sonar-scanner:
+    image: sonarsource/sonar-scanner-cli:latest
+    container_name: week8-sonar-scanner
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    profiles:
+      - manual
+    networks:
+      - sonarnet
+    working_dir: /usr/src
+    volumes:
+      - .:/usr/src
+    command:
+      - -Dsonar.host.url=http://sonarqube:9000
+      - -Dsonar.login=${SONAR_TOKEN:-}
+
+networks:
+  sonarnet:
+
+volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:

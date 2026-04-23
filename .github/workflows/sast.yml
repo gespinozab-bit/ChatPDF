@@ -1,0 +1,29 @@
+name: SAST
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  bandit:
+    name: Bandit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+
+      - name: Run SAST
+        run: uv run bandit -c pyproject.toml -r app ingestor.py query.py

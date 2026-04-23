@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import tempfile
@@ -14,6 +15,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import AuthenticationError, RateLimitError
 
 from .config import Settings, settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class RAGError(Exception):
@@ -204,9 +208,9 @@ class RAGService:
         vector_store = self._vector_store()
         try:
             vector_store.delete_collection()
-        except Exception:
+        except Exception as exc:
             # The collection may not exist on the first upload.
-            pass
+            logger.debug("Could not delete PGVector collection before reset: %s", exc)
         return self._vector_store()
 
     def _use_local_fallback(self, chunks: list[Any], filename: str) -> None:

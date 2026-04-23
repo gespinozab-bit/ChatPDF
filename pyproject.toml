@@ -17,3 +17,12 @@ dependencies = [
     "pypdf>=6.9.2",
     "uvicorn[standard]>=0.38.0",
 ]
+
+[dependency-groups]
+dev = [
+    "bandit[toml]>=1.9.4",
+]
+
+[tool.bandit]
+exclude_dirs = [".venv", "__pycache__"]
+skips = []
